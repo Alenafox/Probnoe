@@ -1,101 +1,100 @@
-package com.example.retrofit2stub;
+package com.example.firebasedemo;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
-import android.widget.ImageView;
-import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import com.squareup.picasso.Picasso;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.AuthResult;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
-import retrofit2.http.GET;
-import retrofit2.http.Query;
+public class MainActivity extends AppCompatActivity implements ValueEventListener {
+    Place city = new Place("Beijing", 80, 70);
+    DatabaseReference dbRef;
+    final String CHILD = "myplace123";
+    final int RC_SIGN_IN = 123;
+    private FirebaseAuth mAuth = FirebaseAuth.getInstance();
 
-public class MainActivity extends AppCompatActivity {
 
-    String API_URL = "https://pixabay.com/";
-    String q = "bad dog";
-    String key = "18604852-305866ecafd55a05f88babcdb";
-    //String image_type = "photo";
-    String[] image_types = { "all", "photo", "illustration", "vector"};
-    String item;
-    Bitmap bmp;
-
-    interface PixabayAPI {
-        @GET("/api")
-        Call<Response> search(@Query("q") String q, @Query("key") String key, @Query("image_type") String image_type);
-    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, image_types);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        Spinner spinner = (Spinner) findViewById(R.id.spinner);
-        spinner.setAdapter(adapter);
-        AdapterView.OnItemSelectedListener itemSelectedListener = new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                item = (String)parent.getItemAtPosition(position);
-            }
+        EditText latText= findViewById(R.id.latitude);
+        EditText lonText= findViewById(R.id.longtitude);
 
+        String lat = latText.getText().toString();
+        String lon = lonText.getText().toString();
+
+
+        // получаем ссылку на облачную БД
+
+        FirebaseDatabase db = FirebaseDatabase.getInstance();
+        db.getReference("coordinates").child("lat").setValue(10);
+
+        db.getReference().addValueEventListener(new ValueEventListener() {
             @Override
-            public void onNothingSelected(AdapterView<?> adapterView) { }
-        };
-        spinner.setOnItemSelectedListener(itemSelectedListener);
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                Log.d("mytag", "count: " + snapshot.getChildrenCount());
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.d("mytag", "error");
+            }
+        });
+
+
+        //changePlace(city);
+        //Log.d("mytag", "city changed");
     }
 
-    public void startSearch(String text) {
+    public void changePlace(Place p) {
+        dbRef.child(CHILD).setValue(p);
+        dbRef.child(CHILD).push().setValue(new Place("SPb", 11, 22));
+        dbRef.child(CHILD).push().setValue(new Place("Moscow", 33, 44));
+        dbRef.child("myplace");
+        dbRef.child("myplace").child("anotherplace").setValue(p);
+    }
 
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(API_URL)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build();
 
-        PixabayAPI api = retrofit.create(PixabayAPI.class);
+    @Override
+    public void onDataChange(@NonNull DataSnapshot snapshot) {
+        Place place = snapshot.getValue(Place.class);
 
-        Call<Response> call = api.search(text, key, item);
-        Log.d("mytag", "item: " + item);
-
-        Callback<Response> callback = new Callback<Response>() {
-            @Override
-            public void onResponse(Call<Response> call, retrofit2.Response<Response> response) {
-
-                Response r = response.body(); // получили ответ в виде объекта
-                displayResults(r.hits);
-                bmp = BitmapFactory.decodeStream(response.body().byteStream());
-                Log.d("mytag", "hits:" + r.hits.length); // сколько картинок нашлось
-            }
-
-            @Override
-            public void onFailure(Call<Response> call, Throwable t) {
-                // TODO: при возникновении ошибки вывести Toast
-                Log.d("mytag", "Error: " + t.getLocalizedMessage());
-            }
-        };
-        call.enqueue(callback); // ставим запрос в очередь
+        Log.d("mytag", "place: " + place);
+        /*
+       for (DataSnapshot s: snapshot.getChildren() ) {
+           Log.d("mytag", "key: " + s.getKey());
+           Place place = s.getValue(Place.class);
+           Log.d("mytag", "place: " + place);
+       }
+         */
 
     }
 
-    public void displayResults(Hit[] hits) {
-        ImageView im = findViewById(R.id.image);
-        im.setImageBitmap(bmp);
-    }
+    @Override
+    public void onCancelled(@NonNull DatabaseError error) {
 
-    public void onSearchClick(View v) {
-        EditText etSearch = findViewById(R.id.text);
-        String text = etSearch.getText().toString();
-        startSearch(text);
     }
 }
